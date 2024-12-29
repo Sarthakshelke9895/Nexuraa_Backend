@@ -1,44 +1,63 @@
-const express = require('express');
-const nodemailer = require('nodemailer');
+const express = require("express");
+const nodemailer = require("nodemailer");
+const cors = require("cors");
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = 5000;
 
-// Middleware
-app.use(express.json());
 
-// Test Route
-app.get('/', (req, res) => {
-    res.send('Server is Live!');
+
+var corsOptions = {
+  origin: 'https://nexuraa.netlify.app/',
+  methods:"GET,POST,PUT,DELETE,PATCH,HEAD",
+  credentials:true,
+  optionsSuccessStatus: 200 // some legacy browsers (IE11, various SmartTVs) choke on 204
+}
+app.use(cors(corsOptions));
+
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ limit: "25mb" }));
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  next();
 });
 
-// Email Sending Route
-app.post('/send-email', async (req, res) => {
-    const { to, subject, text } = req.body;
+function sendEmail({ email }) {
+  return new Promise((resolve, reject) => {
+    var transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "sarthakshelke044@gmail.com",
+        pass: "zxnuraqbieicgxqf",
+      },
+    });
 
-    try {
-        const transporter = nodemailer.createTransport({
-            service: 'gmail', // Use your email provider
-            auth: {
-                user: process.env.EMAIL, // Set in .env file
-                pass: process.env.PASSWORD, // Set in .env file
-            },
-        });
+    const mail_configs = {
+      from: "sarthakshelke044@gmail.com",
+      to: email,
+      subject:"Nexura",
+      html: `
+      <p>Your form has been submitted successfully.Please ensure that every details are correct.<br></br>Your App will be  live on website in 2-3 bussiness working days.
+      </br> Thank you for choosing the Nexura.<br></br>We Will Inform you once our App is Uploaded. </p>
+      <p>Best Regards</p>
+      `,
+     
+    };
+    transporter.sendMail(mail_configs, function (error, info) {
+      if (error) {
+        console.log(error);
+        return reject({ message: `An error has occurred` });
+      }
+      return resolve({ message: "Email sent successfully" });
+    });
+  }); 
+}
 
-        const mailOptions = {
-            from: process.env.EMAIL,
-            to,
-            subject,
-            text,
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.status(200).send('Email sent successfully');
-    } catch (error) {
-        res.status(500).send('Failed to send email');
-    }
+app.get("/", (req, res) => {
+  sendEmail(req.query)
+    .then((response) => res.send(response.message))
+    .catch((error) => res.status(500).send(error.message));
 });
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+app.listen(port, () => {
+  console.log(`nodemailerProject is listening at http://localhost:${port}`);
 });
