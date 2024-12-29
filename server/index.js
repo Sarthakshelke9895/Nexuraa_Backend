@@ -1,7 +1,8 @@
-const nodemailer = require("nodemailer");
-const formidable = require("formidable");
-const fs = require("fs");
+import nodemailer from "nodemailer";
+import formidable from "formidable";
+import fs from "fs";
 
+// The handler function to handle POST requests for sending the form data and email
 export default function handler(req, res) {
   if (req.method === "POST") {
     // Handling file upload using Formidable
@@ -22,15 +23,16 @@ export default function handler(req, res) {
         return res.status(400).json({ error: "Please fill all the fields." });
       }
 
-      // Send Email to Client
+      // Setup nodemailer transporter
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: process.env.GMAIL_USER, // your Gmail address
-          pass: process.env.GMAIL_PASS, // your Gmail password or app-specific password
+          user: process.env.GMAIL_USER, // Your Gmail address
+          pass: process.env.GMAIL_PASS, // Your Gmail app password
         },
       });
 
+      // Client email options
       const clientMailOptions = {
         from: process.env.GMAIL_USER,
         to: email,
@@ -38,10 +40,10 @@ export default function handler(req, res) {
         text: `Hello ${name},\n\nYour app, ${appname}, has been successfully uploaded.\n\nApp Description: ${appdesc}\n\nOwner: ${owner}\n\nRegards,\nYour App Upload Team`,
       };
 
-      // Send Email to Admin (You)
+      // Admin email options (you, the app owner)
       const adminMailOptions = {
         from: process.env.GMAIL_USER,
-        to: "sarthakshelke044@gmail.com", // your email address
+        to: "your-email@example.com", // Your email address to receive submissions
         subject: "New App Upload Submission",
         html: `
           <h1>New App Upload Submitted</h1>
@@ -54,25 +56,25 @@ export default function handler(req, res) {
           <p><strong>App Description:</strong> ${appdesc}</p>
           <p><strong>App Slogan:</strong> ${slogan}</p>
           <h3>Files:</h3>
-          <p><strong>APK File:</strong> <a href="file://${apkFile.path}">${apkFile.originalFilename}</a></p>
-          <p><strong>App Logo:</strong> <a href="file://${appLogoFile.path}">${appLogoFile.originalFilename}</a></p>
+          <p><strong>APK File:</strong> ${apkFile ? `<a href="${apkFile.path}">${apkFile.originalFilename}</a>` : "No file uploaded"}</p>
+          <p><strong>App Logo:</strong> ${appLogoFile ? `<a href="${appLogoFile.path}">${appLogoFile.originalFilename}</a>` : "No file uploaded"}</p>
         `,
         attachments: [
           {
             filename: apkFile.originalFilename,
-            path: apkFile.path, // You may need to upload this to a service like AWS S3
+            path: apkFile.path,
           },
           {
             filename: appLogoFile.originalFilename,
-            path: appLogoFile.path, // Similarly, upload this image to a storage service
+            path: appLogoFile.path,
           },
         ],
       };
 
-      // Sending emails
+      // Send emails
       try {
-        await transporter.sendMail(clientMailOptions);
-        await transporter.sendMail(adminMailOptions);
+        await transporter.sendMail(clientMailOptions); // Send to client
+        await transporter.sendMail(adminMailOptions); // Send to admin
         res.status(200).send("Form submitted successfully");
       } catch (error) {
         console.error("Error sending email:", error);
