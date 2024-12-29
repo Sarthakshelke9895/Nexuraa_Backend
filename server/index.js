@@ -1,102 +1,85 @@
-require('dotenv').config();
-const express = require('express');
-const nodemailer = require('nodemailer');
-const multer = require('multer');
-const path = require('path');
-const app = express();
-const cors = require('cors');
+const nodemailer = require("nodemailer");
+const formidable = require("formidable");
+const fs = require("fs");
 
-// Enable CORS
-app.use(cors());
-
-// Setup storage for multer (for handling file uploads)
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Save files in the 'uploads' folder
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename
-  }
-});
-
-const upload = multer({ storage: storage });
-
-// Serve the uploads directory as static
-app.use('/uploads', express.static('uploads'));
-
-// Endpoint to handle the form submission
-app.post('/send-email', upload.fields([{ name: 'apkfile' }, { name: 'applogo' }]), (req, res) => {
-  const { name, email, phone, address, appname, slogan, owner, appdesc } = req.body;
-
-  const clientEmail = email;
-  const adminEmail = 'sarthakshelke044@gmail.com';
-
-  const apkfile = req.files['apkfile'][0]; // Path to uploaded APK
-  const applogo = req.files['applogo'][0]; // Path to uploaded App Logo
-
-  // Set up Nodemailer transporter
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL,
-      pass: process.env.PASSWORD,
-    }
-  });
-
-  // Email to client (App upload info)
-  const clientMailOptions = {
-    from: process.env.EMAIL,
-    to: clientEmail,
-    subject: 'App Upload Information',
-    text: `Hello ${name},\n\nYour app upload details have been received.\n\nThank you for submitting your app.\n\nBest regards,\nNexura`
-  };
-
-  // Email to admin with form data and attachments
-  const adminMailOptions = {
-    from: process.env.EMAIL,
-    to: adminEmail,
-    subject: 'New App Upload Submission',
-    text: `
-      New app submission received:
-      Name: ${name}
-      Email: ${email}
-      Phone: ${phone}
-      Address: ${address}
-      App Name: ${appname}
-      Slogan: ${slogan}
-      Owner: ${owner}
-      Description: ${appdesc}
-    `,
-    attachments: [
-      {
-        filename: apkfile.filename,
-        path: apkfile.path,
-      },
-      {
-        filename: applogo.filename,
-        path: applogo.path,
-      }
-    ]
-  };
-
-  // Send both emails
-  transporter.sendMail(clientMailOptions, (err, info) => {
-    if (err) {
-      return res.status(500).send('Error sending email to client');
-    }
-
-    transporter.sendMail(adminMailOptions, (err, info) => {
+export default function handler(req, res) {
+  if (req.method === "POST") {
+    // Handling file upload using Formidable
+    const form = new formidable.IncomingForm();
+    form.uploadDir = "./temp"; // temporary directory
+    form.keepExtensions = true;
+    form.parse(req, async (err, fields, files) => {
       if (err) {
-        return res.status(500).send('Error sending email to admin');
+        res.status(500).send("Error in file upload");
+        return;
       }
 
-      res.status(200).send('Emails sent successfully');
-    });
-  });
-});
+      const { name, email, phone, address, appname, owner, apkfile, applogo, appdesc, slogan } = fields;
+      const { apkfile: apkFile, applogo: appLogoFile } = files;
 
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+      // Ensure all required fields are filled
+      if (!name || !email || !phone || !address || !appname || !owner || !appdesc) {
+        return res.status(400).json({ error: "Please fill all the fields." });
+      }
+
+      // Send Email to Client
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.GMAIL_USER, // your Gmail address
+          pass: process.env.GMAIL_PASS, // your Gmail password or app-specific password
+        },
+      });
+
+      const clientMailOptions = {
+        from: process.env.GMAIL_USER,
+        to: email,
+        subject: "App Upload Information",
+        text: `Hello ${name},\n\nYour app, ${appname}, has been successfully uploaded.\n\nApp Description: ${appdesc}\n\nOwner: ${owner}\n\nRegards,\nYour App Upload Team`,
+      };
+
+      // Send Email to Admin (You)
+      const adminMailOptions = {
+        from: process.env.GMAIL_USER,
+        to: "sarthakshelke044@gmail.com", // your email address
+        subject: "New App Upload Submission",
+        html: `
+          <h1>New App Upload Submitted</h1>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Phone:</strong> ${phone}</p>
+          <p><strong>Address:</strong> ${address}</p>
+          <p><strong>App Name:</strong> ${appname}</p>
+          <p><strong>Owner:</strong> ${owner}</p>
+          <p><strong>App Description:</strong> ${appdesc}</p>
+          <p><strong>App Slogan:</strong> ${slogan}</p>
+          <h3>Files:</h3>
+          <p><strong>APK File:</strong> <a href="file://${apkFile.path}">${apkFile.originalFilename}</a></p>
+          <p><strong>App Logo:</strong> <a href="file://${appLogoFile.path}">${appLogoFile.originalFilename}</a></p>
+        `,
+        attachments: [
+          {
+            filename: apkFile.originalFilename,
+            path: apkFile.path, // You may need to upload this to a service like AWS S3
+          },
+          {
+            filename: appLogoFile.originalFilename,
+            path: appLogoFile.path, // Similarly, upload this image to a storage service
+          },
+        ],
+      };
+
+      // Sending emails
+      try {
+        await transporter.sendMail(clientMailOptions);
+        await transporter.sendMail(adminMailOptions);
+        res.status(200).send("Form submitted successfully");
+      } catch (error) {
+        console.error("Error sending email:", error);
+        res.status(500).send("Error sending email");
+      }
+    });
+  } else {
+    res.status(405).send("Method Not Allowed");
+  }
+}
