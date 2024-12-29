@@ -28,13 +28,13 @@ function sendEmail({ email }) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.EMAIL || "sarthakshelke044@gmail.com", // Use environment variables for credentials
-        pass: process.env.PASSWORD || "zxnuraqbieicgxqf",
+        user: process.env.EMAIL , // Use environment variables for credentials
+        pass: process.env.PASSWORD ,
       },
     });
 
     const mailConfigs = {
-      from: process.env.EMAIL || "sarthakshelke044@gmail.com",
+      from: process.env.EMAIL ,
       to: email,
       subject: "Nexura",
       html: `
