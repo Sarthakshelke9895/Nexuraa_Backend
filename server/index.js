@@ -43,7 +43,7 @@ export default function handler(req, res) {
       // Admin email options (you, the app owner)
       const adminMailOptions = {
         from: process.env.GMAIL_USER,
-        to: "your-email@example.com", // Your email address to receive submissions
+        to: "sarthakshelke044@gmail.com", // Your email address to receive submissions
         subject: "New App Upload Submission",
         html: `
           <h1>New App Upload Submitted</h1>
